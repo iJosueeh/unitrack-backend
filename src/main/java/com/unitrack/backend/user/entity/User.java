@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.unitrack.backend.activity.entity.Activity;
 import com.unitrack.backend.common.entity.BaseEntity;
+import com.unitrack.backend.projects.entity.Projects;
 import com.unitrack.backend.user.enums.Rol;
 import com.unitrack.backend.workspaces.entity.Workspaces;
 import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
@@ -51,5 +52,11 @@ public class User extends BaseEntity {
     private List<WorkspacesMembers> workspacesMembers;
 
     @OneToMany(mappedBy = "user")
-    private Activity activity;
+    private List<Activity> activity;
+
+    @OneToMany(mappedBy = "createdBy")
+    private List<Projects> createdProjects;
+
+    @OneToMany(mappedBy = "assignedTo")
+    private List<Projects> assignedProjects;
 }
