@@ -1,15 +1,18 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
-    name: spring-boot-jwt-starter
+    name: unitrack-backend
 
   profiles:
     active:
       - dev
 
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/unitrack}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -25,8 +28,8 @@ spring:
       "[indent_output]": true
 
 jwt:
-  secret: ${JWT_SECRET}
-  refresh-secret: ${JWT_REFRESH_SECRET}
+  secret: ${JWT_SECRET:change-this-secret-key-at-least-32-characters}
+  refresh-secret: ${JWT_REFRESH_SECRET:change-this-refresh-secret-key-at-least-32-characters}
   expiration: 900000
   refresh-expiration: 604800000
 

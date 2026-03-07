@@ -8,11 +8,11 @@
 		<version>4.0.3</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.template</groupId>
-	<artifactId>spring-boot-jwt-starter</artifactId>
+	<groupId>com.unitrack</groupId>
+	<artifactId>unitrack-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>spring-boot-jwt-starter</name>
-	<description>JWT authentication starter for Spring Boot</description>
+	<name>unitrack-backend</name>
+	<description>UniTrack backend service built with Spring Boot</description>
 	<url/>
 	<licenses>
 		<license/>

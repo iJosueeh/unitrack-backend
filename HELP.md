@@ -1,7 +1,7 @@
 # Read Me First
 The following was discovered as part of building this project:
 
-* The original package name 'com.template.spring.spring_boot-jwt-neon-starter' is invalid and this project uses 'com.template.jwtstarter' instead.
+* The original package name was invalid and this project now uses `com.unitrack.backend`.
 
 # Getting Started
 
