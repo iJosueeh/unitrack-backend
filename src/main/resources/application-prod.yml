@@ -4,6 +4,13 @@ spring:
     hibernate:
       ddl-auto: validate
 
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://app.unitrack.com}
+    allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
+    allowed-headers: ${CORS_ALLOWED_HEADERS:*}
+    allow-credentials: ${CORS_ALLOW_CREDENTIALS:true}
+
 server:
   port: ${PORT:8080}
 

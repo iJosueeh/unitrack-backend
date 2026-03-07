@@ -2,12 +2,12 @@ package com.unitrack.backend.projects.events;
 
 import java.util.UUID;
 
-public class ProjectCreatedEvent {
+public class CreatedProjectEvent {
 
     private final UUID projectId;
     private final UUID userId;
 
-    public ProjectCreatedEvent(UUID projectId, UUID userId) {
+    public CreatedProjectEvent(UUID projectId, UUID userId) {
         this.projectId = projectId;
         this.userId = userId;
     }

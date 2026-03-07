@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import com.unitrack.backend.auth.dto.AuthResponse;
 import com.unitrack.backend.auth.dto.LoginRequest;
 import com.unitrack.backend.auth.dto.RegisterRequest;
-import com.unitrack.backend.auth.events.UserCreatedEvent;
+import com.unitrack.backend.auth.events.CreatedUserEvent;
 import com.unitrack.backend.security.jwt.JwtService;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.user.enums.Rol;
@@ -49,7 +49,7 @@ public class AuthService {
         user.setRole(Rol.USER);
 
         User savedUser = userRepository.save(user);
-        publisher.publishEvent(new UserCreatedEvent(savedUser.getId()));
+        publisher.publishEvent(new CreatedUserEvent(savedUser.getId()));
         log.info("User created with email: {}", savedUser.getEmail());
         return buildAuthResponse(savedUser);
     }

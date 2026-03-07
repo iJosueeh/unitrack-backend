@@ -2,11 +2,11 @@ package com.unitrack.backend.auth.events;
 
 import java.util.UUID;
 
-public class UserCreatedEvent {
+public class CreatedUserEvent {
 
     private UUID userId;
 
-    public UserCreatedEvent(UUID userId) {
+    public CreatedUserEvent(UUID userId) {
         this.userId = userId;
     }
 

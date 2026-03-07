@@ -7,7 +7,7 @@ import com.unitrack.backend.activity.entity.Activity;
 import com.unitrack.backend.activity.enums.ActivityAction;
 import com.unitrack.backend.activity.enums.ActivityEntityType;
 import com.unitrack.backend.activity.repository.ActivityRepository;
-import com.unitrack.backend.auth.events.UserCreatedEvent;
+import com.unitrack.backend.auth.events.CreatedUserEvent;
 import com.unitrack.backend.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ public class UsersListener {
     private final UserRepository userRepository;
 
     @EventListener
-    public void handleUserCreated(UserCreatedEvent event) {
+    public void handleUserCreated(CreatedUserEvent event) {
         Activity activity = new Activity();
 
         activity.setUser(userRepository.getReferenceById(event.getUserId()));
