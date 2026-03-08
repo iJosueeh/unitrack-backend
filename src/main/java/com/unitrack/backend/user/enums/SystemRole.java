@@ -1,6 +1,6 @@
 package com.unitrack.backend.user.enums;
 
-public enum Rol {
+public enum SystemRole {
     USER,
     ADMIN
 }

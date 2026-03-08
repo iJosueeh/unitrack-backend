@@ -5,7 +5,7 @@ import java.util.List;
 import com.unitrack.backend.activity.entity.Activity;
 import com.unitrack.backend.common.entity.BaseEntity;
 import com.unitrack.backend.projects.entity.Projects;
-import com.unitrack.backend.user.enums.Rol;
+import com.unitrack.backend.user.enums.SystemRole;
 import com.unitrack.backend.workspaces.entity.Workspaces;
 import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
 
@@ -38,7 +38,7 @@ public class User extends BaseEntity {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    private Rol role;
+    private SystemRole role;
 
     private Boolean isActive;
 

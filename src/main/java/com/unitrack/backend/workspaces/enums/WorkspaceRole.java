@@ -1,6 +1,7 @@
 package com.unitrack.backend.workspaces.enums;
 
-public enum Rol {
+public enum WorkspaceRole {
     OWNER,
-    MEMBER
+    ADMIN,
+    USER
 }

@@ -8,13 +8,15 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.unitrack.backend.activity.enums.ActivityAction;
+import com.unitrack.backend.activity.enums.ActivityEntityType;
+import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.auth.dto.AuthResponse;
 import com.unitrack.backend.auth.dto.LoginRequest;
 import com.unitrack.backend.auth.dto.RegisterRequest;
-import com.unitrack.backend.auth.events.CreatedUserEvent;
 import com.unitrack.backend.security.jwt.JwtService;
 import com.unitrack.backend.user.entity.User;
-import com.unitrack.backend.user.enums.Rol;
+import com.unitrack.backend.user.enums.SystemRole;
 import com.unitrack.backend.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -46,10 +48,14 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setIsActive(true);
-        user.setRole(Rol.USER);
+        user.setRole(SystemRole.USER);
 
         User savedUser = userRepository.save(user);
-        publisher.publishEvent(new CreatedUserEvent(savedUser.getId()));
+        publisher.publishEvent(new ActivityEvent(
+            savedUser.getId(),
+            ActivityAction.CREATED,
+            ActivityEntityType.USERS,
+            savedUser.getId()));
         log.info("User created with email: {}", savedUser.getEmail());
         return buildAuthResponse(savedUser);
     }

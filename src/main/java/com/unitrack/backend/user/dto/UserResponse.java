@@ -2,7 +2,7 @@ package com.unitrack.backend.user.dto;
 
 import java.util.UUID;
 
-import com.unitrack.backend.user.enums.Rol;
+import com.unitrack.backend.user.enums.SystemRole;
 
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +14,6 @@ public class UserResponse {
     private UUID id;
     private String fullName;
     private String email;
-    private Rol role;
+    private SystemRole role;
     private Boolean isActive;
 }

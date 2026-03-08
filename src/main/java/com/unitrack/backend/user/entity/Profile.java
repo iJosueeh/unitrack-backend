@@ -1,8 +1,11 @@
 package com.unitrack.backend.user.entity;
 
 import com.unitrack.backend.common.entity.BaseEntity;
+import com.unitrack.backend.user.enums.JobTitle;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
@@ -27,4 +30,7 @@ public class Profile extends BaseEntity {
     private String bio;
 
     private String imageUrl;
+
+    @Enumerated(EnumType.STRING)
+    private JobTitle jobTitle;
 }

@@ -4,7 +4,7 @@ import java.sql.Timestamp;
 
 import com.unitrack.backend.common.entity.BaseEntity;
 import com.unitrack.backend.user.entity.User;
-import com.unitrack.backend.workspaces.enums.Rol;
+import com.unitrack.backend.workspaces.enums.WorkspaceRole;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -35,7 +35,7 @@ public class WorkspacesMembers extends BaseEntity {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    private Rol role;
+    private WorkspaceRole role;
 
     private Timestamp joinedAt;
 

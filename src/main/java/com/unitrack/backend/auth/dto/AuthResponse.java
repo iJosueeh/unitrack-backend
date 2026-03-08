@@ -2,7 +2,7 @@ package com.unitrack.backend.auth.dto;
 
 import java.util.UUID;
 
-import com.unitrack.backend.user.enums.Rol;
+import com.unitrack.backend.user.enums.SystemRole;
 
 import lombok.Builder;
 import lombok.Data;
@@ -15,5 +15,5 @@ public class AuthResponse {
     private long expiresIn;
     private UUID userId;
     private String email;
-    private Rol role;
+    private SystemRole role;
 }
