@@ -5,7 +5,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.unitrack.backend.activity.enums.ActivityAction;
@@ -15,9 +14,11 @@ import com.unitrack.backend.auth.dto.AuthResponse;
 import com.unitrack.backend.auth.dto.LoginRequest;
 import com.unitrack.backend.auth.dto.RegisterRequest;
 import com.unitrack.backend.security.jwt.JwtService;
+import com.unitrack.backend.user.entity.Profile;
 import com.unitrack.backend.user.entity.User;
-import com.unitrack.backend.user.enums.SystemRole;
 import com.unitrack.backend.user.repository.UserRepository;
+import com.unitrack.backend.user.services.ProfileService;
+import com.unitrack.backend.user.services.UserService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +29,8 @@ import lombok.extern.slf4j.Slf4j;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserService usuarioService;
+    private final ProfileService profileService;
     private final AuthenticationManager authenticationManager;
     private final ApplicationEventPublisher publisher;
     private final JwtService jwtService;
@@ -37,27 +39,23 @@ public class AuthService {
     private long expiration;
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("User with email {} is already registered", request.getEmail());
-            throw new IllegalArgumentException("Email is already registered");
-        }
+        User user = usuarioService.createdUser(request);
+        Profile profile = profileService.createProfile(user);
 
-        User user = new User();
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setIsActive(true);
-        user.setRole(SystemRole.USER);
-
-        User savedUser = userRepository.save(user);
         publisher.publishEvent(new ActivityEvent(
-            savedUser.getId(),
-            ActivityAction.CREATED,
-            ActivityEntityType.USERS,
-            savedUser.getId()));
-        log.info("User created with email: {}", savedUser.getEmail());
-        return buildAuthResponse(savedUser);
+                user.getId(),
+                ActivityAction.CREATED,
+                ActivityEntityType.USERS,
+                user.getId()));
+
+        publisher.publishEvent(new ActivityEvent(
+                profile.getUser().getId(),
+                ActivityAction.CREATED,
+                ActivityEntityType.PROFILE,
+                profile.getId()));
+
+        log.info("User created with email: {}", user.getEmail());
+        return buildAuthResponse(user);
     }
 
     public AuthResponse login(LoginRequest request) {

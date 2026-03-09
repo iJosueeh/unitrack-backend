@@ -42,7 +42,7 @@ public class User extends BaseEntity {
 
     private Boolean isActive;
 
-        @OneToOne(mappedBy = "user")
+    @OneToOne(mappedBy = "user")
     private Profile profile;
 
     @OneToMany(mappedBy = "ownerId")
