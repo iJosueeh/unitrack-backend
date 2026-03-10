@@ -31,6 +31,8 @@ public class Workspaces extends BaseEntity {
     @JoinColumn(name = "owner_id")
     private User ownerId;
 
+    private Integer limitMembers;
+
     @OneToMany(mappedBy = "workspaces")
     private List<WorkspacesMembers> members;
 

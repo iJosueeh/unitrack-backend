@@ -6,5 +6,6 @@ public enum ActivityAction {
     DELETED,
     ASSIGN,
     COMMENT,
-    MOVED
+    MOVED,
+    INVITED
 }
