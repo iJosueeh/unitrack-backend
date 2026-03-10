@@ -8,5 +8,6 @@ public enum ActivityEntityType {
     WORKSPACE_MEMBERS,
     TASKS,
     ATTACHMENTS,
-    COMMENTS
+    COMMENTS,
+    DASHBOARD_STATS
 }
