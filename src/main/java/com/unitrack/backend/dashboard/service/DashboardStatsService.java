@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.unitrack.backend.dashboard.dto.DashboardStatsResponse;
 import com.unitrack.backend.dashboard.entity.DashboardStats;
@@ -21,6 +22,7 @@ public class DashboardStatsService {
     private final DashboardStatsRepository dashboardStatsRepository;
     private final WorkspaceRepository workspaceRepository;
 
+    @Transactional
     public DashboardStats createdDashStats(UUID workspaceId) {
         if (workspaceId == null) {
             log.error("Workspace ID is null. Cannot create DashboardStats.");

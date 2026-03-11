@@ -5,6 +5,7 @@ import java.sql.Timestamp;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.unitrack.backend.dashboard.dto.ProjectStatsResponse;
 import com.unitrack.backend.dashboard.entity.ProjectStats;
@@ -20,6 +21,7 @@ public class ProjectStatsService {
 
     private final ProjectStatsRepository projectStatsRepository;
 
+    @Transactional
     public ProjectStats createdProjectStats(UUID projectId) {
         if (projectId == null) {
             log.error("Project ID is null");

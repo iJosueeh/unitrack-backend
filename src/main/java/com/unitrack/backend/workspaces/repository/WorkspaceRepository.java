@@ -10,4 +10,5 @@ public interface WorkspaceRepository extends JpaRepository<Workspaces, UUID> {
 
     Workspaces findByName(String name);
     Workspaces findByIdAndOwnerId(UUID id, UUID ownerId);
+    Long countByOwnerId(UUID ownerId);
 }
