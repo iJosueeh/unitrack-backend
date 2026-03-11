@@ -7,9 +7,17 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.unitrack.backend.activity.enums.ActivityAction;
+import com.unitrack.backend.activity.enums.ActivityEntityType;
+import com.unitrack.backend.activity.event.ActivityEvent;
+import com.unitrack.backend.auth.services.CurrentUserService;
+import com.unitrack.backend.workspaces.dto.AcceptInviteRequest;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.user.repository.UserRepository;
 import com.unitrack.backend.workspaces.dto.CreatedInviteRequest;
@@ -31,9 +39,11 @@ import lombok.extern.slf4j.Slf4j;
 public class WorkspaceInviteService {
 
     private final WorkspaceRepository workspaceRepository;
+    private final CurrentUserService currentUserService;
     private final UserRepository userRepository;
     private final WorkspaceInviteRepository workspaceInviteRepository;
     private final WorkspacesMembersRepository workspacesMembersRepository;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional
     public CreatedInviteResponse createInvite(CreatedInviteRequest request) {
@@ -47,24 +57,15 @@ public class WorkspaceInviteService {
             throw new IllegalArgumentException("Workspace ID is required");
         }
 
-        if (request.getCreatedById() == null) {
-            log.error("CreatedBy ID is null in the request");
-            throw new IllegalArgumentException("CreatedBy ID is required");
-        }
-
         Workspaces workspace = workspaceRepository.findById(request.getWorkspaceId())
                 .orElseThrow(() -> {
                     log.error("Workspace with ID {} not found", request.getWorkspaceId());
                     return new IllegalArgumentException("Workspace not found");
                 });
 
-        User user = userRepository.findById(request.getCreatedById())
-                .orElseThrow(() -> {
-                    log.error("User with ID {} not found", request.getCreatedById());
-                    return new IllegalArgumentException("User not found");
-                });
+        User user = currentUserService.getAuthenticatedUser();
 
-        validateCanManageInvites(workspace.getId(), user.getId());
+        validateCanManageInvites(workspace, user.getId());
 
         if (!workspaceInviteRepository.findByWorkspaces_IdAndIsActiveTrue(workspace.getId()).isEmpty()) {
             log.warn("Workspace {} already has an active invite", workspace.getId());
@@ -84,9 +85,20 @@ public class WorkspaceInviteService {
         invite.setMaxUses(1);
         invite.setUsedCount(0);
 
-        WorkspaceInvite savedInvite = workspaceInviteRepository.save(invite);
+        WorkspaceInvite savedInvite;
+        try {
+            savedInvite = workspaceInviteRepository.save(invite);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Workspace {} already has an active invite due to concurrent request", workspace.getId());
+            throw new IllegalArgumentException("Workspace already has an active invite");
+        }
         log.info("Workspace invite created with ID: {}", savedInvite.getId());
 
+        publisher.publishEvent(new ActivityEvent(
+                user.getId(),
+                ActivityAction.CREATED,
+                ActivityEntityType.WORKSPACE_INVITE,
+                savedInvite.getId()));
         return new CreatedInviteResponse(
                 savedInvite.getId(),
                 rawCode,
@@ -94,18 +106,22 @@ public class WorkspaceInviteService {
     }
 
     @Transactional
-    public void acceptInvite(String rawCode, UUID userId) {
-        if (rawCode == null || rawCode.isBlank()) {
+    public void acceptInvite(AcceptInviteRequest request) {
+        if (request == null) {
+            log.error("AcceptInviteRequest is null");
+            throw new IllegalArgumentException("AcceptInviteRequest cannot be null");
+        }
+
+        if (request.code() == null || request.code().isBlank()) {
             log.error("Raw invite code is null or blank");
             throw new IllegalArgumentException("Invite code is required");
         }
 
-        if (userId == null) {
-            log.error("User ID is null");
-            throw new IllegalArgumentException("User ID is required");
-        }
+        User authenticatedUser = currentUserService.getAuthenticatedUser();
+        UUID userId = authenticatedUser.getId();
 
-        WorkspaceInvite invite = findValidInviteByCode(rawCode);
+        String normalizedCode = normalizeInviteCode(request.code());
+        WorkspaceInvite invite = findValidInviteByCode(normalizedCode);
         Workspaces workspace = invite.getWorkspaces();
 
         if (workspacesMembersRepository.existsByWorkspaces_IdAndUser_Id(workspace.getId(), userId)) {
@@ -126,12 +142,18 @@ public class WorkspaceInviteService {
         membership.setUser(user);
         membership.setRole(WorkspaceRole.USER);
         membership.setJoinedAt(new java.sql.Timestamp(System.currentTimeMillis()));
-        workspacesMembersRepository.save(membership);
+        try {
+            workspacesMembersRepository.save(membership);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("User {} attempted to join workspace {} concurrently", userId, workspace.getId());
+            throw new IllegalArgumentException("User is already a member of the workspace");
+        }
 
         invite.setUsedCount(invite.getUsedCount() + 1);
         if (invite.getUsedCount() >= invite.getMaxUses()) {
             invite.setIsActive(false);
         }
+
         workspaceInviteRepository.save(invite);
         log.info("User with ID {} accepted invite and joined workspace {}", userId, workspace.getId());
     }
@@ -143,17 +165,16 @@ public class WorkspaceInviteService {
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
             log.error("Error occurred while hashing the value", e);
-            throw new RuntimeException("Error occurred while hashing the value", e);
+            throw new IllegalStateException("Error occurred while hashing the value", e);
         }
     }
 
-    private void validateCanManageInvites(UUID workspaceId, UUID userId) {
-        Workspaces workspace = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> {
-                    log.error("Workspace with ID {} not found", workspaceId);
-                    return new IllegalArgumentException("Workspace not found");
-                });
+    private String normalizeInviteCode(String rawCode) {
+        return rawCode.trim().replace("-", "").toLowerCase();
+    }
 
+    private void validateCanManageInvites(Workspaces workspace, UUID userId) {
+        UUID workspaceId = workspace.getId();
         if (workspace.getOwnerId().getId().equals(userId)) {
             return;
         }
@@ -163,11 +184,11 @@ public class WorkspaceInviteService {
 
         if (membership == null) {
             log.error("User with ID {} is not a member of workspace {}", userId, workspaceId);
-            throw new IllegalArgumentException("User is not a member of the workspace");
+            throw new AccessDeniedException("User is not a member of the workspace");
         }
 
         if (membership.getRole() != WorkspaceRole.OWNER && membership.getRole() != WorkspaceRole.ADMIN) {
-            throw new IllegalArgumentException("User is not allowed to manage invites");
+            throw new AccessDeniedException("User is not allowed to manage invites");
         }
     }
 
@@ -181,17 +202,17 @@ public class WorkspaceInviteService {
                 });
 
         if (!Boolean.TRUE.equals(invite.getIsActive())) {
-            log.warn("Invite with code {} is not active", rawCode);
+            log.warn("Invite is not active");
             throw new IllegalArgumentException("Invite is not active");
         }
 
         if (invite.getExpiresAt().isBefore(LocalDateTime.now())) {
-            log.warn("Invite with code {} has expired", rawCode);
+            log.warn("Invite has expired");
             throw new IllegalArgumentException("Invite has expired");
         }
 
         if (invite.getUsedCount() >= invite.getMaxUses()) {
-            log.warn("Invite with code {} has reached its maximum uses", rawCode);
+            log.warn("Invite has reached its maximum uses");
             throw new IllegalArgumentException("Invite has reached its maximum uses");
         }
 
@@ -201,10 +222,11 @@ public class WorkspaceInviteService {
     private void validateMemberLimit(Workspaces workspace) {
         Integer limit = workspace.getLimitMembers();
         if (limit == null) {
+            log.info("Workspace {} has no member limit", workspace.getId());
             return;
         }
 
-        Long currentMembers = workspacesMembersRepository.countByWorkspaces_Id(workspace.getId());
+        long currentMembers = workspacesMembersRepository.countByWorkspaces_Id(workspace.getId());
         if (currentMembers >= limit) {
             log.warn("Workspace {} has reached its member limit", workspace.getId());
             throw new IllegalArgumentException("Workspace has reached its member limit");

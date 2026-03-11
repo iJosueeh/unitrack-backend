@@ -6,6 +6,7 @@ public enum ActivityEntityType {
     PROFILE,
     USERS,
     WORKSPACE_MEMBERS,
+    WORKSPACE_INVITE,
     TASKS,
     ATTACHMENTS,
     COMMENTS,

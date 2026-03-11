@@ -1,11 +1,12 @@
 package com.unitrack.backend.dashboard.entity;
 
-import java.sql.Timestamp;
+import java.time.LocalDate;
 
 import com.unitrack.backend.common.entity.BaseEntity;
 import com.unitrack.backend.workspaces.entity.Workspaces;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -27,7 +28,8 @@ public class DailyWorkspaceMetrics extends BaseEntity {
     @JoinColumn(name = "workspace_id", nullable = false)
     private Workspaces workspace;
 
-    private Timestamp date;
+    @Column(nullable = false)
+    private LocalDate date;
 
     private Integer tasksCompletedThatDay;
 
