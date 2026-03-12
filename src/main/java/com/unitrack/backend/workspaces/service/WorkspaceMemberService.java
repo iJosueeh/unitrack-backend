@@ -18,7 +18,6 @@ import com.unitrack.backend.workspaces.dto.WorkspaceMemberResponse;
 import com.unitrack.backend.workspaces.entity.Workspaces;
 import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
 import com.unitrack.backend.workspaces.enums.WorkspaceRole;
-import com.unitrack.backend.workspaces.repository.WorkspaceRepository;
 import com.unitrack.backend.workspaces.repository.WorkspacesMembersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,6 @@ import lombok.extern.slf4j.Slf4j;
 public class WorkspaceMemberService {
 
     private final WorkspacesMembersRepository workspacesMembersRepository;
-    private final WorkspaceRepository workspaceRepository;
     private final CurrentUserService currentUserService;
     private final ApplicationEventPublisher publisher;
 
@@ -135,12 +133,6 @@ public class WorkspaceMemberService {
         if (membership == null || membership.getRole() != WorkspaceRole.OWNER) {
             throw new AccessDeniedException("Only the workspace OWNER can change member roles");
         }
-    }
-
-    @SuppressWarnings("unused")
-    private Workspaces loadWorkspace(UUID workspaceId) {
-        return workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new IllegalArgumentException("Workspace not found"));
     }
 
 }
