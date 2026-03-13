@@ -47,9 +47,9 @@ class WorkspacesControllersSmokeTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new WorkspacesController(workspaceService),
-                new WorkspacesMembersController(workspaceMemberService),
-                new WorkspacesInviteController(workspaceInviteService))
+                        new WorkspacesController(workspaceService),
+                        new WorkspacesMembersController(workspaceMemberService),
+                        new WorkspacesInviteController(workspaceInviteService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -83,8 +83,8 @@ class WorkspacesControllersSmokeTest {
                 """;
 
         mockMvc.perform(post("/api/workspaces")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(invalidPayload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidPayload))
                 .andExpect(status().isBadRequest());
     }
 
@@ -97,9 +97,9 @@ class WorkspacesControllersSmokeTest {
                 """;
 
         mockMvc.perform(
-                patch("/api/workspaces/{workspaceId}/members/{userId}/role", UUID.randomUUID(), UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(payload))
+                        patch("/api/workspaces/{workspaceId}/members/{userId}/role", UUID.randomUUID(), UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
@@ -113,8 +113,8 @@ class WorkspacesControllersSmokeTest {
                 """;
 
         mockMvc.perform(post("/api/workspaces/invites/accept")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
                 .andExpect(status().isBadRequest());
     }
 

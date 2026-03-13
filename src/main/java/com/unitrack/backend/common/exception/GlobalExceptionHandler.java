@@ -18,80 +18,80 @@ import com.unitrack.backend.common.response.ApiResponse;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-        @ExceptionHandler(EmailAlreadyRegisteredException.class)
-        public ResponseEntity<?> handleEmailAlreadyRegistered(EmailAlreadyRegisteredException ex) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(
-                                ApiResponse.builder()
-                                                .success(false)
-                                                .message(ex.getMessage())
-                                                .data(null)
-                                                .build());
-        }
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ResponseEntity<?> handleEmailAlreadyRegistered(EmailAlreadyRegisteredException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
 
-        @ExceptionHandler({ AuthenticationCredentialsNotFoundException.class, UsernameNotFoundException.class })
-        public ResponseEntity<?> handleUnauthorized(RuntimeException ex) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                                ApiResponse.builder()
-                                                .success(false)
-                                                .message(ex.getMessage())
-                                                .data(null)
-                                                .build());
-        }
+    @ExceptionHandler({AuthenticationCredentialsNotFoundException.class, UsernameNotFoundException.class})
+    public ResponseEntity<?> handleUnauthorized(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
 
-        @ExceptionHandler(AccessDeniedException.class)
-        public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                                ApiResponse.builder()
-                                                .success(false)
-                                                .message(ex.getMessage())
-                                                .data(null)
-                                                .build());
-        }
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
 
-        @ExceptionHandler(IllegalArgumentException.class)
-        public ResponseEntity<?> handleIllegalArgument(IllegalArgumentException ex) {
-                return ResponseEntity.badRequest().body(
-                                ApiResponse.builder()
-                                                .success(false)
-                                                .message(ex.getMessage())
-                                                .data(null)
-                                                .build());
-        }
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
 
-        @ExceptionHandler(MethodArgumentNotValidException.class)
-        public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
-                Map<String, String> errors = ex.getBindingResult()
-                                .getFieldErrors()
-                                .stream()
-                                .collect(Collectors.toMap(
-                                                FieldError::getField,
-                                                FieldError::getDefaultMessage,
-                                                (first, second) -> second));
-                return ResponseEntity.badRequest().body(
-                                ApiResponse.builder()
-                                                .success(false)
-                                                .message("Validation failed")
-                                                .data(errors)
-                                                .build());
-        }
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .collect(Collectors.toMap(
+                        FieldError::getField,
+                        FieldError::getDefaultMessage,
+                        (first, second) -> second));
+        return ResponseEntity.badRequest().body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message("Validation failed")
+                        .data(errors)
+                        .build());
+    }
 
-        @ExceptionHandler(RuntimeException.class)
-        public ResponseEntity<?> handleRuntime(RuntimeException ex) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                                ApiResponse.builder()
-                                                .success(false)
-                                                .message(ex.getMessage())
-                                                .data(null)
-                                                .build());
-        }
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<?> handleRuntime(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
 
-        @ExceptionHandler(Exception.class)
-        public ResponseEntity<?> handleException(Exception ex) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                                ApiResponse.builder()
-                                                .success(false)
-                                                .message(ex.getMessage())
-                                                .data(null)
-                                                .build());
-        }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleException(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
 }
