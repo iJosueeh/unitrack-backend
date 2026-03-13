@@ -30,7 +30,7 @@ public class ProfileService {
         Profile profile = profileRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Usuario con id {} no encontrado.", id);
-                    throw new RuntimeException("User invalid");
+                    throw new IllegalArgumentException("User invalid");
                 });
         log.info("Perfil encontrado para el usuario con id: {}", id);
         return mapToProfileResponse(profile);
@@ -55,10 +55,14 @@ public class ProfileService {
 
     @Transactional
     public ProfileResponse updateProfile(UUID userId, ProfileUpdateRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Profile update request cannot be null");
+        }
+
         Profile profile = profileRepository.findByUser_Id(userId)
                 .orElseThrow(() -> {
                     log.warn("Profile not found for user with id: {}", userId);
-                    throw new RuntimeException("Profile not found");
+                    throw new IllegalArgumentException("Profile not found");
                 });
 
         User user = profile.getUser();

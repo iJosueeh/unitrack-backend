@@ -28,7 +28,7 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Usuario con id {} no encontrado", id);
-                    throw new RuntimeException("User invalid");
+                    throw new IllegalArgumentException("User invalid");
                 });
         log.info("Usuario encontrado: {}", user.getId());
         return mapTUserResponse(user);
