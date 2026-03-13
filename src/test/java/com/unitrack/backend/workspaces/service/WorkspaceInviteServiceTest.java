@@ -3,6 +3,7 @@ package com.unitrack.backend.workspaces.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -81,7 +82,8 @@ class WorkspaceInviteServiceTest {
 
         when(currentUserService.getAuthenticatedUser()).thenReturn(owner);
         when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
-        when(workspaceInviteRepository.findByWorkspaces_IdAndIsActiveTrue(workspaceId)).thenReturn(List.of(activeInvite));
+        when(workspaceInviteRepository.findByWorkspaces_IdAndIsActiveTrue(workspaceId))
+                .thenReturn(List.of(activeInvite));
         when(workspaceInviteRepository.saveAll(anyList())).thenReturn(List.of(activeInvite));
         when(workspaceInviteRepository.save(any(WorkspaceInvite.class))).thenAnswer(invocation -> {
             WorkspaceInvite saved = invocation.getArgument(0);
@@ -124,7 +126,8 @@ class WorkspaceInviteServiceTest {
         when(workspacesMembersRepository.countByWorkspaces_Id(workspaceId)).thenReturn(0L);
         when(userRepository.findById(userId)).thenReturn(Optional.of(authenticatedUser));
         when(workspacesMembersRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(workspaceInviteRepository.save(any(WorkspaceInvite.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workspaceInviteRepository.save(any(WorkspaceInvite.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         workspaceInviteService.acceptInvite(new AcceptInviteRequest("ABC-123"));
 
@@ -136,5 +139,84 @@ class WorkspaceInviteServiceTest {
         assertFalse(savedInvite.getIsActive());
         verify(workspacesMembersRepository).save(any());
         verify(workspaceInviteRepository, never()).findById(any());
+    }
+
+    @Test
+    void acceptInvite_ShouldFail_WhenInviteCodeIsInvalid() {
+        User authenticatedUser = new User();
+        authenticatedUser.setId(UUID.randomUUID());
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(authenticatedUser);
+        when(workspaceInviteRepository.findByCodeHash(anyString())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            workspaceInviteService.acceptInvite(new AcceptInviteRequest("INVALID-CODE"));
+        });
+
+        verify(workspacesMembersRepository, never()).save(any());
+        verify(workspaceInviteRepository, never()).save(any(WorkspaceInvite.class));
+    }
+
+    @Test
+    void acceptInvite_ShouldFail_WhenInviteIsExpired() {
+        UUID workspaceId = UUID.randomUUID();
+        User authenticatedUser = new User();
+        authenticatedUser.setId(UUID.randomUUID());
+
+        Workspaces workspace = new Workspaces();
+        workspace.setId(workspaceId);
+        workspace.setLimitMembers(10);
+
+        WorkspaceInvite expiredInvite = new WorkspaceInvite();
+        expiredInvite.setId(UUID.randomUUID());
+        expiredInvite.setWorkspaces(workspace);
+        expiredInvite.setIsActive(true);
+        expiredInvite.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        expiredInvite.setMaxUses(1);
+        expiredInvite.setUsedCount(0);
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(authenticatedUser);
+        when(workspaceInviteRepository.findByCodeHash(anyString())).thenReturn(Optional.of(expiredInvite));
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            workspaceInviteService.acceptInvite(new AcceptInviteRequest("EXPIRED-123"));
+        });
+
+        verify(workspacesMembersRepository, never()).save(any());
+        verify(workspaceInviteRepository, never()).save(any(WorkspaceInvite.class));
+    }
+
+    @Test
+    void acceptInvite_ShouldFail_WhenMemberLimitIsReached() {
+        UUID workspaceId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        User authenticatedUser = new User();
+        authenticatedUser.setId(userId);
+
+        Workspaces workspace = new Workspaces();
+        workspace.setId(workspaceId);
+        workspace.setLimitMembers(1);
+
+        WorkspaceInvite invite = new WorkspaceInvite();
+        invite.setId(UUID.randomUUID());
+        invite.setWorkspaces(workspace);
+        invite.setIsActive(true);
+        invite.setExpiresAt(LocalDateTime.now().plusDays(1));
+        invite.setMaxUses(1);
+        invite.setUsedCount(0);
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(authenticatedUser);
+        when(workspaceInviteRepository.findByCodeHash(anyString())).thenReturn(Optional.of(invite));
+        when(workspacesMembersRepository.existsByWorkspaces_IdAndUser_Id(workspaceId, userId)).thenReturn(false);
+        when(workspacesMembersRepository.countByWorkspaces_Id(workspaceId)).thenReturn(1L);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            workspaceInviteService.acceptInvite(new AcceptInviteRequest("LIMIT-123"));
+        });
+
+        verify(userRepository, never()).findById(any());
+        verify(workspacesMembersRepository, never()).save(any());
+        verify(workspaceInviteRepository, never()).save(any(WorkspaceInvite.class));
     }
 }

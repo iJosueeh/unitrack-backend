@@ -38,19 +38,20 @@ public class WorkspaceService {
     public WorkspaceResponse createWorkspace(WorkspaceCreateRequest request) {
         User owner = currentUserService.getAuthenticatedUser();
 
+        String normalizedName = request.getName().trim();
         long existingCount = workspaceRepository.countByOwnerId_Id(owner.getId());
         if (existingCount >= MAX_WORKSPACES_PER_USER) {
             log.warn("User {} reached the workspace limit ({})", owner.getId(), MAX_WORKSPACES_PER_USER);
             throw new IllegalArgumentException("User has reached the maximum number of workspaces allowed");
         }
 
-        if (workspaceRepository.findByName(request.getName()) != null) {
-            log.warn("Workspace with name '{}' already exists", request.getName());
+        if (workspaceRepository.findByName(normalizedName) != null) {
+            log.warn("Workspace with name '{}' already exists", normalizedName);
             throw new IllegalArgumentException("Workspace name already exists");
         }
 
         Workspaces workspace = new Workspaces();
-        workspace.setName(request.getName());
+        workspace.setName(normalizedName);
         workspace.setOwnerId(owner);
         workspace.setLimitMembers(request.getLimitMembers());
 
