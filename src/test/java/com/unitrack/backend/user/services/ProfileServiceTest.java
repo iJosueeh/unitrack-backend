@@ -14,7 +14,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.exception.EmailAlreadyRegisteredException;
+import com.unitrack.backend.common.exception.NotFoundException;
 import com.unitrack.backend.user.dto.ProfileResponse;
 import com.unitrack.backend.user.dto.ProfileUpdateRequest;
 import com.unitrack.backend.user.entity.Profile;
@@ -32,33 +34,45 @@ class ProfileServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CurrentUserService currentUserService;
+
     @InjectMocks
     private ProfileService profileService;
 
     @Test
-    void getProfileResponse_ShouldThrow_WhenProfileNotFound() {
-        UUID profileId = UUID.randomUUID();
-        when(profileRepository.findById(profileId)).thenReturn(Optional.empty());
-
-        assertThrows(IllegalArgumentException.class, () -> profileService.getProfileResponse(profileId));
-    }
-
-    @Test
-    void updateProfile_ShouldThrow_WhenRequestIsNull() {
-        assertThrows(IllegalArgumentException.class, () -> profileService.updateProfile(UUID.randomUUID(), null));
-    }
-
-    @Test
-    void updateProfile_ShouldThrow_WhenProfileNotFound() {
+    void getAuthenticatedProfile_ShouldThrow_WhenProfileNotFound() {
         UUID userId = UUID.randomUUID();
-        ProfileUpdateRequest request = new ProfileUpdateRequest();
+        User user = new User();
+        user.setId(userId);
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(user);
         when(profileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class, () -> profileService.updateProfile(userId, request));
+        assertThrows(NotFoundException.class, () -> profileService.getAuthenticatedProfile());
     }
 
     @Test
-    void updateProfile_ShouldThrow_WhenEmailBelongsToAnotherUser() {
+    void updateAuthenticatedProfile_ShouldThrow_WhenRequestIsNull() {
+        assertThrows(IllegalArgumentException.class,
+                () -> profileService.updateAuthenticatedProfile(null));
+    }
+
+    @Test
+    void updateAuthenticatedProfile_ShouldThrow_WhenProfileNotFound() {
+        UUID userId = UUID.randomUUID();
+        User user = new User();
+        user.setId(userId);
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(user);
+        when(profileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> profileService.updateAuthenticatedProfile(new ProfileUpdateRequest()));
+    }
+
+    @Test
+    void updateAuthenticatedProfile_ShouldThrow_WhenEmailBelongsToAnotherUser() {
         UUID userId = UUID.randomUUID();
 
         User user = new User();
@@ -77,14 +91,16 @@ class ProfileServiceTest {
         ProfileUpdateRequest request = new ProfileUpdateRequest();
         request.setEmail("new@example.com");
 
+        when(currentUserService.getAuthenticatedUser()).thenReturn(user);
         when(profileRepository.findByUser_Id(userId)).thenReturn(Optional.of(profile));
         when(userRepository.existsByEmail("new@example.com")).thenReturn(true);
 
-        assertThrows(EmailAlreadyRegisteredException.class, () -> profileService.updateProfile(userId, request));
+        assertThrows(EmailAlreadyRegisteredException.class,
+                () -> profileService.updateAuthenticatedProfile(request));
     }
 
     @Test
-    void updateProfile_ShouldUpdateAndReturnResponse_WhenRequestIsValid() {
+    void updateAuthenticatedProfile_ShouldUpdateAndReturnResponse_WhenRequestIsValid() {
         UUID userId = UUID.randomUUID();
 
         User user = new User();
@@ -108,12 +124,13 @@ class ProfileServiceTest {
         request.setImgUrl("new-url");
         request.setJobTitle(JobTitle.SENIOR_DEVELOPER);
 
+        when(currentUserService.getAuthenticatedUser()).thenReturn(user);
         when(profileRepository.findByUser_Id(userId)).thenReturn(Optional.of(profile));
         when(userRepository.existsByEmail("john@example.com")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(profileRepository.save(any(Profile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+        when(profileRepository.save(any(Profile.class))).thenAnswer(i -> i.getArgument(0));
 
-        ProfileResponse response = profileService.updateProfile(userId, request);
+        ProfileResponse response = profileService.updateAuthenticatedProfile(request);
 
         assertEquals("John", response.getFirstName());
         assertEquals("Doe", response.getLastName());

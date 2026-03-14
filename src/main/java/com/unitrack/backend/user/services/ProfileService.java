@@ -1,11 +1,11 @@
 package com.unitrack.backend.user.services;
 
-import java.util.UUID;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.exception.EmailAlreadyRegisteredException;
+import com.unitrack.backend.common.exception.NotFoundException;
 import com.unitrack.backend.user.dto.ProfileResponse;
 import com.unitrack.backend.user.dto.ProfileUpdateRequest;
 import com.unitrack.backend.user.entity.Profile;
@@ -24,16 +24,49 @@ public class ProfileService {
 
     private final ProfileRepository profileRepository;
     private final UserRepository userRepository;
+    private final CurrentUserService currentUserService;
 
-    public ProfileResponse getProfileResponse(UUID id) {
-        log.info("Encontrando perfil del usuario con id: {}", id);
-        Profile profile = profileRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.warn("Usuario con id {} no encontrado.", id);
-                    throw new IllegalArgumentException("User invalid");
-                });
-        log.info("Perfil encontrado para el usuario con id: {}", id);
+    @Transactional(readOnly = true)
+    public ProfileResponse getAuthenticatedProfile() {
+        User user = currentUserService.getAuthenticatedUser();
+        Profile profile = profileRepository.findByUser_Id(user.getId())
+                .orElseThrow(() -> new NotFoundException("Profile not found"));
+        log.info("Profile retrieved for user {}", user.getId());
         return mapToProfileResponse(profile);
+    }
+
+    @Transactional
+    public ProfileResponse updateAuthenticatedProfile(ProfileUpdateRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Profile update request cannot be null");
+        }
+
+        User user = currentUserService.getAuthenticatedUser();
+        Profile profile = profileRepository.findByUser_Id(user.getId())
+                .orElseThrow(() -> new NotFoundException("Profile not found"));
+
+        log.info("Updating profile for user {}", user.getId());
+
+        if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
+        if (request.getLastName() != null) user.setLastName(request.getLastName());
+
+        if (request.getEmail() != null) {
+            String newEmail = request.getEmail().trim();
+            if (!newEmail.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(newEmail)) {
+                log.warn("Email {} is already registered by another user", newEmail);
+                throw new EmailAlreadyRegisteredException("Email is already registered");
+            }
+            user.setEmail(newEmail);
+        }
+
+        if (request.getBio() != null) profile.setBio(request.getBio());
+        if (request.getImgUrl() != null) profile.setImageUrl(request.getImgUrl());
+        if (request.getJobTitle() != null) profile.setJobTitle(request.getJobTitle());
+
+        userRepository.save(user);
+        Profile saved = profileRepository.save(profile);
+        log.info("Profile updated for user {}", user.getId());
+        return mapToProfileResponse(saved);
     }
 
     public Profile createProfile(User user) {
@@ -48,62 +81,9 @@ public class ProfileService {
         profile.setImageUrl(null);
         profile.setJobTitle(JobTitle.NONE);
 
-        Profile savedProfile = profileRepository.save(profile);
-        log.info("Profile created for user with id: {}", user.getId());
-        return savedProfile;
-    }
-
-    @Transactional
-    public ProfileResponse updateProfile(UUID userId, ProfileUpdateRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("Profile update request cannot be null");
-        }
-
-        Profile profile = profileRepository.findByUser_Id(userId)
-                .orElseThrow(() -> {
-                    log.warn("Profile not found for user with id: {}", userId);
-                    throw new IllegalArgumentException("Profile not found");
-                });
-
-        User user = profile.getUser();
-        log.info("Updating profile for user with id: {}", user.getId());
-
-        if (request.getFirstName() != null) {
-            user.setFirstName(request.getFirstName());
-        }
-
-        if (request.getLastName() != null) {
-            user.setLastName(request.getLastName());
-        }
-
-        if (request.getEmail() != null) {
-            String newEmail = request.getEmail().trim();
-
-            boolean isDifferentEmail = !newEmail.equalsIgnoreCase(user.getEmail());
-            if (isDifferentEmail && userRepository.existsByEmail(newEmail)) {
-                log.warn("Email {} is already registered by another user", newEmail);
-                throw new EmailAlreadyRegisteredException("Email is already registered");
-            }
-
-            user.setEmail(newEmail);
-        }
-
-        if (request.getBio() != null) {
-            profile.setBio(request.getBio());
-        }
-
-        if (request.getImgUrl() != null) {
-            profile.setImageUrl(request.getImgUrl());
-        }
-
-        if (request.getJobTitle() != null) {
-            profile.setJobTitle(request.getJobTitle());
-        }
-
-        userRepository.save(user);
-        Profile savedProfile = profileRepository.save(profile);
-        log.info("Profile updated for user with id: {}", userId);
-        return mapToProfileResponse(savedProfile);
+        Profile saved = profileRepository.save(profile);
+        log.info("Profile created for user {}", user.getId());
+        return saved;
     }
 
     private ProfileResponse mapToProfileResponse(Profile body) {
@@ -117,5 +97,4 @@ public class ProfileService {
                 .jobTitle(body.getJobTitle())
                 .build();
     }
-
 }

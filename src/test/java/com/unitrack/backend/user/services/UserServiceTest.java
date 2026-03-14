@@ -17,7 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.unitrack.backend.auth.dto.RegisterRequest;
+import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.exception.EmailAlreadyRegisteredException;
+import com.unitrack.backend.common.exception.NotFoundException;
 import com.unitrack.backend.user.dto.UserResponse;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.user.enums.SystemRole;
@@ -31,6 +33,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private CurrentUserService currentUserService;
 
     @InjectMocks
     private UserService userService;
@@ -62,16 +67,16 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class, () -> userService.getUserById(userId));
+        assertThrows(NotFoundException.class, () -> userService.getUserById(userId));
     }
 
     @Test
-    void createdUser_ShouldThrow_WhenRequestIsNull() {
-        assertThrows(IllegalArgumentException.class, () -> userService.createdUser(null));
+    void createUser_ShouldThrow_WhenRequestIsNull() {
+        assertThrows(IllegalArgumentException.class, () -> userService.createUser(null));
     }
 
     @Test
-    void createdUser_ShouldThrow_WhenEmailAlreadyExists() {
+    void createUser_ShouldThrow_WhenEmailAlreadyExists() {
         RegisterRequest request = new RegisterRequest();
         request.setFirstName("John");
         request.setLastName("Doe");
@@ -80,11 +85,11 @@ class UserServiceTest {
 
         when(userRepository.existsByEmail("john@example.com")).thenReturn(true);
 
-        assertThrows(EmailAlreadyRegisteredException.class, () -> userService.createdUser(request));
+        assertThrows(EmailAlreadyRegisteredException.class, () -> userService.createUser(request));
     }
 
     @Test
-    void createdUser_ShouldPersist_WhenRequestIsValid() {
+    void createUser_ShouldPersist_WhenRequestIsValid() {
         RegisterRequest request = new RegisterRequest();
         request.setFirstName("John");
         request.setLastName("Doe");
@@ -99,7 +104,7 @@ class UserServiceTest {
             return saved;
         });
 
-        User created = userService.createdUser(request);
+        User created = userService.createUser(request);
 
         assertNotNull(created.getId());
         assertEquals("john@example.com", created.getEmail());

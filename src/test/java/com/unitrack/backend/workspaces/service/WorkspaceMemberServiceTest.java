@@ -1,6 +1,7 @@
 package com.unitrack.backend.workspaces.service;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -21,6 +22,7 @@ import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
 import com.unitrack.backend.workspaces.enums.WorkspaceRole;
 import com.unitrack.backend.workspaces.repository.WorkspacesMembersRepository;
+import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 
 @ExtendWith(MockitoExtension.class)
 public class WorkspaceMemberServiceTest {
@@ -34,6 +36,9 @@ public class WorkspaceMemberServiceTest {
     @Mock
     private ApplicationEventPublisher publisher;
 
+    @Mock
+    private WorkspaceAccessPolicy workspaceAccessPolicy;
+
     @InjectMocks
     private WorkspaceMemberService workspaceMemberService;
 
@@ -46,16 +51,12 @@ public class WorkspaceMemberServiceTest {
         User requester = new User();
         requester.setId(requesterId);
 
-        WorkspacesMembers requesterMembership = new WorkspacesMembers();
-        requesterMembership.setRole(WorkspaceRole.ADMIN);
-
         when(currentUserService.getAuthenticatedUser()).thenReturn(requester);
-        when(workspacesMembersRepository.findByWorkspaces_IdAndUser_Id(workspaceId, requesterId))
-                .thenReturn(requesterMembership);
+        doThrow(new AccessDeniedException("Only the workspace OWNER can perform this action"))
+                .when(workspaceAccessPolicy).requireOwner(workspaceId, requesterId);
 
-        assertThrows(AccessDeniedException.class, () -> {
-            workspaceMemberService.updateMemberRole(workspaceId, targetUserId, WorkspaceRole.USER);
-        });
+        assertThrows(AccessDeniedException.class, () ->
+                workspaceMemberService.updateMemberRole(workspaceId, targetUserId, WorkspaceRole.USER));
     }
 
     @Test
@@ -67,15 +68,10 @@ public class WorkspaceMemberServiceTest {
         User requester = new User();
         requester.setId(requesterId);
 
-        WorkspacesMembers requesterMembership = new WorkspacesMembers();
-        requesterMembership.setRole(WorkspaceRole.ADMIN);
-
         WorkspacesMembers targetMembership = new WorkspacesMembers();
         targetMembership.setRole(WorkspaceRole.USER);
 
         when(currentUserService.getAuthenticatedUser()).thenReturn(requester);
-        when(workspacesMembersRepository.findByWorkspaces_IdAndUser_Id(workspaceId, requesterId))
-                .thenReturn(requesterMembership);
         when(workspacesMembersRepository.findByWorkspaces_IdAndUser_Id(workspaceId, targetUserId))
                 .thenReturn(targetMembership);
 
@@ -94,21 +90,15 @@ public class WorkspaceMemberServiceTest {
         User requester = new User();
         requester.setId(requesterId);
 
-        WorkspacesMembers requesterMembership = new WorkspacesMembers();
-        requesterMembership.setRole(WorkspaceRole.ADMIN);
-
         WorkspacesMembers targetMembership = new WorkspacesMembers();
         targetMembership.setRole(WorkspaceRole.OWNER);
 
         when(currentUserService.getAuthenticatedUser()).thenReturn(requester);
-        when(workspacesMembersRepository.findByWorkspaces_IdAndUser_Id(workspaceId, requesterId))
-                .thenReturn(requesterMembership);
         when(workspacesMembersRepository.findByWorkspaces_IdAndUser_Id(workspaceId, targetUserId))
                 .thenReturn(targetMembership);
 
-        assertThrows(IllegalArgumentException.class, () -> {
-            workspaceMemberService.removeMember(workspaceId, targetUserId);
-        });
+        assertThrows(IllegalArgumentException.class, () ->
+                workspaceMemberService.removeMember(workspaceId, targetUserId));
 
         verify(workspacesMembersRepository, never()).delete(targetMembership);
     }

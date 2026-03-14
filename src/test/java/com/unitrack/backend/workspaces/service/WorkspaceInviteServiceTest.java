@@ -35,6 +35,7 @@ import com.unitrack.backend.workspaces.entity.Workspaces;
 import com.unitrack.backend.workspaces.repository.WorkspaceInviteRepository;
 import com.unitrack.backend.workspaces.repository.WorkspaceRepository;
 import com.unitrack.backend.workspaces.repository.WorkspacesMembersRepository;
+import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 
 @ExtendWith(MockitoExtension.class)
 class WorkspaceInviteServiceTest {
@@ -56,6 +57,9 @@ class WorkspaceInviteServiceTest {
 
     @Mock
     private ApplicationEventPublisher publisher;
+
+    @Mock
+    private WorkspaceAccessPolicy workspaceAccessPolicy;
 
     @InjectMocks
     private WorkspaceInviteService workspaceInviteService;

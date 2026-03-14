@@ -1,6 +1,8 @@
 package com.unitrack.backend.projects.service;
 
 import com.unitrack.backend.auth.services.CurrentUserService;
+import com.unitrack.backend.common.exception.ConflictException;
+import com.unitrack.backend.common.exception.NotFoundException;
 import com.unitrack.backend.common.utils.ValidateDateRange;
 import com.unitrack.backend.projects.dto.*;
 import com.unitrack.backend.projects.entity.Projects;
@@ -9,53 +11,53 @@ import com.unitrack.backend.projects.repository.ProjectsRepository;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.user.repository.UserRepository;
 import com.unitrack.backend.workspaces.entity.Workspaces;
-import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
-import com.unitrack.backend.workspaces.enums.WorkspaceRole;
 import com.unitrack.backend.workspaces.repository.WorkspaceRepository;
-import com.unitrack.backend.workspaces.repository.WorkspacesMembersRepository;
+import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProjectService {
 
     private final ProjectsRepository projectsRepository;
     private final CurrentUserService currentUserService;
-    private final WorkspacesMembersRepository workspacesMembersRepository;
+    private final WorkspaceAccessPolicy workspaceAccessPolicy;
     private final WorkspaceRepository workspaceRepository;
     private final UserRepository userRepository;
-    private ValidateDateRange validate;
+    private final ValidateDateRange validate;
 
-
-    public ProjectResponse createProject(ProjectCreateRequest request) {
+    @Transactional
+    public ProjectResponse createProject(UUID workspaceId, ProjectCreateRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Project create request cannot be null");
         }
 
-        UUID workspaceId = request.workspaceId();
         User requester = currentUserService.getAuthenticatedUser();
-        WorkspacesMembers membership = requiredMembership(workspaceId, requester.getId());
-        validateCanWrite(membership);
+        workspaceAccessPolicy.requireManagePermission(workspaceId, requester.getId());
 
-        String normalizedName = request.name().trim();
+        String normalizedName = normalizeRequiredProjectName(request.name());
         if (projectsRepository.existsByNameIgnoreCaseAndWorkspaces_Id(normalizedName, workspaceId)) {
-            throw new IllegalArgumentException("Project name already exists in this workspace");
+            log.warn("Project name '{}' already exists in workspace '{}'", normalizedName, workspaceId);
+            throw new ConflictException("Project name already exists in this workspace");
         }
 
         validate.validateDateRange(request.startDate(), request.endDate());
-        Workspaces workspaces = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new IllegalArgumentException("Workspace not found"));
+        Workspaces workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new NotFoundException("Workspace not found"));
 
         User assignedTo = null;
         if (request.assignedToId() != null) {
-            requiredMembership(workspaceId, request.assignedToId());
+            workspaceAccessPolicy.requireMembership(workspaceId, request.assignedToId());
             assignedTo = userRepository.findById(request.assignedToId())
-                    .orElseThrow(() -> new IllegalArgumentException("Assigned user not found"));
+                    .orElseThrow(() -> new NotFoundException("Assigned user not found"));
         }
 
         Projects project = new Projects();
@@ -69,67 +71,172 @@ public class ProjectService {
         project.setEndDate(request.endDate());
         project.setCreatedBy(requester);
         project.setAssignedTo(assignedTo);
-        project.setWorkspaces(workspaces);
+        project.setWorkspaces(workspace);
 
-        Projects savedProject = projectsRepository.save(project);
-        return mapToProjectResponse(savedProject);
+        Projects saved = projectsRepository.save(project);
+        log.info("Project '{}' created with ID '{}' in workspace '{}'", saved.getName(), saved.getId(), workspaceId);
+        return mapToProjectResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public List<ProjectSummaryResponse> getProjectsByWorkspace(UUID workspaceId) {
-        return null; // TODO: Implement logic to fetch project summaries for a workspace
+        User user = currentUserService.getAuthenticatedUser();
+        workspaceAccessPolicy.requireMembership(workspaceId, user.getId());
+
+        log.info("Retrieving projects for workspace '{}'", workspaceId);
+        return projectsRepository.findSummariesByWorkspaceId(workspaceId)
+                .stream()
+                .map(this::mapToSummaryResponse)
+                .toList();
     }
 
+    @Transactional(readOnly = true)
     public ProjectResponse getProjectById(UUID workspaceId, UUID projectId) {
-        return null; // TODO: Implement logic to fetch a project by its ID within a workspace
+        User requester = currentUserService.getAuthenticatedUser();
+        workspaceAccessPolicy.requireMembership(workspaceId, requester.getId());
+
+        Projects project = findProjectInWorkspace(projectId, workspaceId);
+        log.info("Project '{}' found in workspace '{}'", projectId, workspaceId);
+        return mapToProjectResponse(project);
     }
 
+    @Transactional
     public ProjectResponse updateProject(UUID workspaceId, UUID projectId, ProjectUpdateRequest request) {
-        return null; // TODO: implement logic to update a project by its ID within a workspace
-    }
-
-    public ProjectResponse assignUser(UUID workspaceId, UUID projectId, ProjectAssignRequest request) {
-        return null; // TODO: implement logic to assign a user to a project
-    }
-
-    public ProjectResponse updateStatus(UUID workspaceId, UUID projectId, ProjectStatusUpdateRequest request) {
-        return null; // TODO: implement logic to update the status of a project
-    }
-
-    private WorkspacesMembers requiredMembership(UUID workspaceId, UUID userId) {
-        if (workspaceId == null) {
-            throw new IllegalArgumentException("Workspace ID is required");
+        if (request == null) {
+            throw new IllegalArgumentException("Project update request cannot be null");
         }
 
-        WorkspacesMembers membership = workspacesMembersRepository.findByWorkspaces_IdAndUser_Id(workspaceId, userId);
-        if (membership == null) {
-            throw new AccessDeniedException("User is not a member of this workspace");
+        User requester = currentUserService.getAuthenticatedUser();
+        workspaceAccessPolicy.requireManagePermission(workspaceId, requester.getId());
+
+        Projects project = findProjectInWorkspace(projectId, workspaceId);
+
+        if (request.name() != null) {
+            String normalizedName = normalizeProjectName(request.name());
+            boolean changed = !normalizedName.equalsIgnoreCase(project.getName());
+            if (changed && projectsRepository.existsByNameIgnoreCaseAndWorkspaces_Id(normalizedName, workspaceId)) {
+                log.warn("Project name '{}' already exists in workspace '{}'", normalizedName, workspaceId);
+                throw new ConflictException("Project name already exists in this workspace");
+            }
+            project.setName(normalizedName);
         }
-        return membership;
+
+        if (request.description() != null) project.setDescription(request.description());
+        if (request.client() != null) project.setClient(request.client());
+        if (request.status() != null) project.setStatus(request.status());
+        if (request.priority() != null) project.setPriority(request.priority());
+        if (request.budget() != null) project.setBudget(request.budget());
+
+        Timestamp nextStart = request.startDate() != null ? request.startDate() : project.getStartDate();
+        Timestamp nextEnd = request.endDate() != null ? request.endDate() : project.getEndDate();
+        validate.validateDateRange(nextStart, nextEnd);
+
+        if (request.startDate() != null) project.setStartDate(request.startDate());
+        if (request.endDate() != null) project.setEndDate(request.endDate());
+
+        if (request.assignedToId() != null) {
+            workspaceAccessPolicy.requireMembership(workspaceId, request.assignedToId());
+            User assignedTo = userRepository.findById(request.assignedToId())
+                    .orElseThrow(() -> new NotFoundException("Assigned user not found"));
+            project.setAssignedTo(assignedTo);
+        }
+
+        Projects saved = projectsRepository.save(project);
+        log.info("Project '{}' updated in workspace '{}'", projectId, workspaceId);
+        return mapToProjectResponse(saved);
     }
 
-    private void validateCanWrite(WorkspacesMembers membership) {
-        WorkspaceRole role = membership.getRole();
-        if (role != WorkspaceRole.OWNER && role != WorkspaceRole.ADMIN) {
-            throw new AccessDeniedException("Only OWNER or ADMIN can manage projects");
+    @Transactional
+    public ProjectResponse assignProjectMember(UUID workspaceId, UUID projectId, ProjectAssignRequest request) {
+        if (request == null || request.assignedToId() == null) {
+            throw new IllegalArgumentException("Assigned user ID is required");
         }
+
+        User requester = currentUserService.getAuthenticatedUser();
+        workspaceAccessPolicy.requireManagePermission(workspaceId, requester.getId());
+
+        Projects project = findProjectInWorkspace(projectId, workspaceId);
+
+        workspaceAccessPolicy.requireMembership(workspaceId, request.assignedToId());
+        User assignedTo = userRepository.findById(request.assignedToId())
+                .orElseThrow(() -> new NotFoundException("Assigned user not found"));
+
+        project.setAssignedTo(assignedTo);
+        Projects saved = projectsRepository.save(project);
+        log.info("User '{}' assigned to project '{}' in workspace '{}'", request.assignedToId(), projectId, workspaceId);
+        return mapToProjectResponse(saved);
     }
 
-    private ProjectResponse mapToProjectResponse(Projects request) {
+    @Transactional
+    public ProjectResponse unassignProjectMember(UUID workspaceId, UUID projectId) {
+        User requester = currentUserService.getAuthenticatedUser();
+        workspaceAccessPolicy.requireManagePermission(workspaceId, requester.getId());
+
+        Projects project = findProjectInWorkspace(projectId, workspaceId);
+        if (project.getAssignedTo() == null) {
+            log.info("Project '{}' in workspace '{}' is already unassigned", projectId, workspaceId);
+            return mapToProjectResponse(project);
+        }
+
+        project.setAssignedTo(null);
+        Projects saved = projectsRepository.save(project);
+        log.info("Project '{}' unassigned successfully in workspace '{}'", projectId, workspaceId);
+        return mapToProjectResponse(saved);
+    }
+
+    @Transactional
+    public ProjectResponse updateProjectStatus(UUID workspaceId, UUID projectId, ProjectStatusUpdateRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Project status update request cannot be null");
+        }
+        if (request.status() == null) {
+            throw new IllegalArgumentException("Project status is required");
+        }
+
+        User requester = currentUserService.getAuthenticatedUser();
+        workspaceAccessPolicy.requireManagePermission(workspaceId, requester.getId());
+
+        Projects project = findProjectInWorkspace(projectId, workspaceId);
+        project.setStatus(request.status());
+        if (request.priority() != null) project.setPriority(request.priority());
+
+        Projects saved = projectsRepository.save(project);
+        log.info("Project '{}' status updated to '{}' in workspace '{}'", projectId, request.status(), workspaceId);
+        return mapToProjectResponse(saved);
+    }
+
+    private Projects findProjectInWorkspace(UUID projectId, UUID workspaceId) {
+        return projectsRepository.findByIdAndWorkspaces_Id(projectId, workspaceId)
+                .orElseThrow(() -> new NotFoundException("Project not found in this workspace"));
+    }
+
+    private String normalizeRequiredProjectName(String rawName) {
+        if (rawName == null) throw new IllegalArgumentException("Project name is required");
+        return normalizeProjectName(rawName);
+    }
+
+    private String normalizeProjectName(String rawName) {
+        String normalized = rawName.trim();
+        if (normalized.isBlank()) throw new IllegalArgumentException("Project name is required");
+        return normalized;
+    }
+
+    private ProjectResponse mapToProjectResponse(Projects project) {
         return new ProjectResponse(
-                request.getId(),
-                request.getName(),
-                request.getDescription(),
-                request.getClient(),
-                request.getStatus(),
-                request.getPriority(),
-                request.getBudget(),
-                request.getStartDate(),
-                request.getEndDate(),
-                request.getAssignedTo() != null ? request.getAssignedTo().getId() : null,
-                request.getCreatedBy() != null ? request.getCreatedBy().getId() : null,
-                request.getWorkspaces().getId(),
-                request.getCreatedAt(),
-                request.getUpdatedAt()
+                project.getId(),
+                project.getName(),
+                project.getDescription(),
+                project.getClient(),
+                project.getStatus(),
+                project.getPriority(),
+                project.getBudget(),
+                project.getStartDate(),
+                project.getEndDate(),
+                project.getCreatedBy() != null ? project.getCreatedBy().getId() : null,
+                project.getAssignedTo() != null ? project.getAssignedTo().getId() : null,
+                project.getWorkspaces().getId(),
+                project.getCreatedAt(),
+                project.getUpdatedAt()
         );
     }
 
@@ -158,5 +265,4 @@ public class ProjectService {
                 view.getUpdatedAt()
         );
     }
-
 }

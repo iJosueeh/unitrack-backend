@@ -13,7 +13,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record ProjectCreateRequest(
-        @NotBlank(message = "Project name is required") @Size(min = 2, max = 100, message = "Project name must have between 2 and 100 characters")
+        @NotBlank(message = "Project name is required") @Size(min = 2, max = 120, message = "Project name must have between 2 and 120 characters")
         String name,
 
         @Size(max = 800, message = "Project description must have at most 800 characters")
@@ -37,8 +37,5 @@ public record ProjectCreateRequest(
 
         @NotNull(message = "Project end date is required")
         Timestamp endDate,
-
-        @NotNull(message = "Workspace ID is required")
-        UUID workspaceId,
 
         UUID assignedToId) {}

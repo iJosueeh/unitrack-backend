@@ -1,7 +1,10 @@
 package com.unitrack.backend.common.utils;
 
+import org.springframework.stereotype.Component;
+
 import java.sql.Timestamp;
 
+@Component
 public class ValidateDateRange {
 
     public void validateDateRange(Timestamp startDate, Timestamp endDate) {

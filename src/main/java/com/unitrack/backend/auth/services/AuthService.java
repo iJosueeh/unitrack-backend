@@ -29,7 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final UserService usuarioService;
+    private final UserService userService;
     private final ProfileService profileService;
     private final AuthenticationManager authenticationManager;
     private final ApplicationEventPublisher publisher;
@@ -39,7 +39,7 @@ public class AuthService {
     private long expiration;
 
     public AuthResponse register(RegisterRequest request) {
-        User user = usuarioService.createdUser(request);
+        User user = userService.createUser(request);
         Profile profile = profileService.createProfile(user);
 
         publisher.publishEvent(new ActivityEvent(

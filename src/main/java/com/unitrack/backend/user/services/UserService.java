@@ -6,7 +6,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.unitrack.backend.auth.dto.RegisterRequest;
+import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.exception.EmailAlreadyRegisteredException;
+import com.unitrack.backend.common.exception.NotFoundException;
 import com.unitrack.backend.user.dto.UserResponse;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.user.enums.SystemRole;
@@ -22,21 +24,22 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final CurrentUserService currentUserService;
 
-    public UserResponse getUserById(UUID id) {
-        log.info("Encontrando usuario con id: {}", id);
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> {
-                    log.warn("Usuario con id {} no encontrado", id);
-                    throw new IllegalArgumentException("User invalid");
-                });
-        log.info("Usuario encontrado: {}", user.getId());
-        return mapTUserResponse(user);
+    public UserResponse getAuthenticatedUserResponse() {
+        User user = currentUserService.getAuthenticatedUser();
+        return mapToUserResponse(user);
     }
 
-    public User createdUser(RegisterRequest request) {
+    public UserResponse getUserById(UUID id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        return mapToUserResponse(user);
+    }
+
+    public User createUser(RegisterRequest request) {
         if (request == null) {
-            log.warn("RegisterRequest es nulo");
+            log.warn("RegisterRequest is null");
             throw new IllegalArgumentException("Request cannot be null");
         }
 
@@ -45,27 +48,26 @@ public class UserService {
             throw new EmailAlreadyRegisteredException("Email is already registered");
         }
 
-        User usuario = new User();
-        usuario.setFirstName(request.getFirstName());
-        usuario.setLastName(request.getLastName());
-        usuario.setEmail(request.getEmail());
-        usuario.setPassword(passwordEncoder.encode(request.getPassword()));
-        usuario.setIsActive(true);
-        usuario.setRole(SystemRole.USER);
-        
-        User savedUser = userRepository.save(usuario);
-        log.info("Usuario creado con email: {}", savedUser.getEmail());
-        return savedUser;
+        User user = new User();
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setIsActive(true);
+        user.setRole(SystemRole.USER);
+
+        User saved = userRepository.save(user);
+        log.info("User created with email: {}", saved.getEmail());
+        return saved;
     }
 
-    private UserResponse mapTUserResponse(User body) {
+    private UserResponse mapToUserResponse(User body) {
         return UserResponse.builder()
                 .id(body.getId())
-                .fullName(body.getFirstName().concat(" ").concat(body.getLastName()))
+                .fullName(body.getFirstName() + " " + body.getLastName())
                 .email(body.getEmail())
                 .role(body.getRole())
                 .isActive(body.getIsActive())
                 .build();
-    };
-
+    }
 }

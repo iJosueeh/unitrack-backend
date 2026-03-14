@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,12 +12,14 @@ import com.unitrack.backend.activity.enums.ActivityAction;
 import com.unitrack.backend.activity.enums.ActivityEntityType;
 import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.auth.services.CurrentUserService;
+import com.unitrack.backend.common.exception.NotFoundException;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.workspaces.dto.WorkspaceMemberResponse;
 import com.unitrack.backend.workspaces.entity.Workspaces;
 import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
 import com.unitrack.backend.workspaces.enums.WorkspaceRole;
 import com.unitrack.backend.workspaces.repository.WorkspacesMembersRepository;
+import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class WorkspaceMemberService {
     private final WorkspacesMembersRepository workspacesMembersRepository;
     private final CurrentUserService currentUserService;
     private final ApplicationEventPublisher publisher;
+    private final WorkspaceAccessPolicy workspaceAccessPolicy;
 
     public void createOwnerMembership(Workspaces workspace, User owner) {
         WorkspacesMembers membership = new WorkspacesMembers();
@@ -45,10 +47,7 @@ public class WorkspaceMemberService {
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> getMembers(UUID workspaceId) {
         User requester = currentUserService.getAuthenticatedUser();
-
-        if (!workspacesMembersRepository.existsByWorkspaces_IdAndUser_Id(workspaceId, requester.getId())) {
-            throw new AccessDeniedException("User is not a member of this workspace");
-        }
+        workspaceAccessPolicy.requireMembership(workspaceId, requester.getId());
 
         return workspacesMembersRepository.findByWorkspaces_Id(workspaceId)
                 .stream()
@@ -66,13 +65,12 @@ public class WorkspaceMemberService {
     @Transactional
     public void removeMember(UUID workspaceId, UUID targetUserId) {
         User requester = currentUserService.getAuthenticatedUser();
-        validateCanManageMembers(workspaceId, requester.getId());
+        workspaceAccessPolicy.requireManagePermission(workspaceId, requester.getId());
 
         WorkspacesMembers target = workspacesMembersRepository
                 .findByWorkspaces_IdAndUser_Id(workspaceId, targetUserId);
-
         if (target == null) {
-            throw new IllegalArgumentException("User is not a member of this workspace");
+            throw new NotFoundException("User is not a member of this workspace");
         }
         if (target.getRole() == WorkspaceRole.OWNER) {
             throw new IllegalArgumentException("Cannot remove the workspace owner");
@@ -90,7 +88,7 @@ public class WorkspaceMemberService {
     @Transactional
     public void updateMemberRole(UUID workspaceId, UUID targetUserId, WorkspaceRole newRole) {
         User requester = currentUserService.getAuthenticatedUser();
-        validateIsOwner(workspaceId, requester.getId());
+        workspaceAccessPolicy.requireOwner(workspaceId, requester.getId());
 
         if (newRole == WorkspaceRole.OWNER) {
             throw new IllegalArgumentException("Cannot assign the OWNER role through this operation");
@@ -98,9 +96,8 @@ public class WorkspaceMemberService {
 
         WorkspacesMembers membership = workspacesMembersRepository
                 .findByWorkspaces_IdAndUser_Id(workspaceId, targetUserId);
-
         if (membership == null) {
-            throw new IllegalArgumentException("User is not a member of this workspace");
+            throw new NotFoundException("User is not a member of this workspace");
         }
         if (membership.getRole() == WorkspaceRole.OWNER) {
             throw new IllegalArgumentException("Cannot change the role of the workspace owner");
@@ -115,24 +112,4 @@ public class WorkspaceMemberService {
                 membership.getId()));
         log.info("User {} updated role of {} to {} in workspace {}", requester.getId(), targetUserId, newRole, workspaceId);
     }
-
-    private void validateCanManageMembers(UUID workspaceId, UUID userId) {
-        WorkspacesMembers membership = workspacesMembersRepository
-                .findByWorkspaces_IdAndUser_Id(workspaceId, userId);
-        if (membership == null) {
-            throw new AccessDeniedException("User is not a member of this workspace");
-        }
-        if (membership.getRole() != WorkspaceRole.OWNER && membership.getRole() != WorkspaceRole.ADMIN) {
-            throw new AccessDeniedException("Only OWNER or ADMIN can manage workspace members");
-        }
-    }
-
-    private void validateIsOwner(UUID workspaceId, UUID userId) {
-        WorkspacesMembers membership = workspacesMembersRepository
-                .findByWorkspaces_IdAndUser_Id(workspaceId, userId);
-        if (membership == null || membership.getRole() != WorkspaceRole.OWNER) {
-            throw new AccessDeniedException("Only the workspace OWNER can change member roles");
-        }
-    }
-
 }
