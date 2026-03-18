@@ -1,6 +1,9 @@
 package com.unitrack.backend.tasks.service;
 
 import com.unitrack.backend.auth.services.CurrentUserService;
+import com.unitrack.backend.activity.enums.ActivityAction;
+import com.unitrack.backend.activity.enums.ActivityEntityType;
+import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.common.enums.Priority;
 import com.unitrack.backend.common.enums.Status;
 import com.unitrack.backend.projects.entity.Projects;
@@ -17,9 +20,11 @@ import com.unitrack.backend.workspaces.entity.Workspaces;
 import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.sql.Timestamp;
@@ -54,6 +59,9 @@ class TaskServiceTest {
 
     @Mock
     private WorkspaceAccessPolicy workspaceAccessPolicy;
+
+    @Mock
+    private ApplicationEventPublisher publisher;
 
     @InjectMocks
     private TaskService taskService;
@@ -144,6 +152,14 @@ class TaskServiceTest {
         assertEquals(projectId, response.projectId());
         assertEquals(requesterId, response.createdById());
         assertEquals(assigneeId, response.assignedToId());
+
+        ArgumentCaptor<ActivityEvent> captor = ArgumentCaptor.forClass(ActivityEvent.class);
+        verify(publisher).publishEvent(captor.capture());
+        ActivityEvent event = captor.getValue();
+        assertEquals(requesterId, event.getUserId());
+        assertEquals(ActivityAction.CREATED, event.getAction());
+        assertEquals(ActivityEntityType.TASKS, event.getEntityType());
+        assertEquals(taskId, event.getEntityId());
     }
 
     @Test
@@ -249,6 +265,43 @@ class TaskServiceTest {
         taskService.deleteTask(workspaceId, projectId, taskId);
 
         verify(taskRepository).delete(task);
+        ArgumentCaptor<ActivityEvent> captor = ArgumentCaptor.forClass(ActivityEvent.class);
+        verify(publisher).publishEvent(captor.capture());
+        ActivityEvent event = captor.getValue();
+        assertEquals(requesterId, event.getUserId());
+        assertEquals(ActivityAction.DELETED, event.getAction());
+        assertEquals(ActivityEntityType.TASKS, event.getEntityType());
+        assertEquals(taskId, event.getEntityId());
+    }
+
+    @Test
+    void updateTaskStatus_ShouldPublishUpdatedEvent_WhenRequestIsValid() {
+        UUID workspaceId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+
+        User requester = new User();
+        requester.setId(requesterId);
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(requester);
+        when(taskRepository.findByIdAndProject_IdAndProject_Workspaces_Id(taskId, projectId, workspaceId))
+                .thenReturn(Optional.of(task(taskId, projectId, workspaceId, requester)));
+        when(taskRepository.save(any(Tasks.class))).thenAnswer(i -> i.getArgument(0));
+
+        taskService.updateTaskStatus(
+                workspaceId,
+                projectId,
+                taskId,
+                new TaskStatusUpdateRequest(Status.IN_PROGRESS, Priority.HIGH));
+
+        ArgumentCaptor<ActivityEvent> captor = ArgumentCaptor.forClass(ActivityEvent.class);
+        verify(publisher).publishEvent(captor.capture());
+        ActivityEvent event = captor.getValue();
+        assertEquals(requesterId, event.getUserId());
+        assertEquals(ActivityAction.UPDATED, event.getAction());
+        assertEquals(ActivityEntityType.TASKS, event.getEntityType());
+        assertEquals(taskId, event.getEntityId());
     }
 
     private Projects project(UUID projectId, UUID workspaceId) {

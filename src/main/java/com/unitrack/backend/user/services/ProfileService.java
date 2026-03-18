@@ -1,8 +1,12 @@
 package com.unitrack.backend.user.services;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.unitrack.backend.activity.enums.ActivityAction;
+import com.unitrack.backend.activity.enums.ActivityEntityType;
+import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.exception.EmailAlreadyRegisteredException;
 import com.unitrack.backend.common.exception.NotFoundException;
@@ -25,6 +29,7 @@ public class ProfileService {
     private final ProfileRepository profileRepository;
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public ProfileResponse getAuthenticatedProfile() {
@@ -65,6 +70,11 @@ public class ProfileService {
 
         userRepository.save(user);
         Profile saved = profileRepository.save(profile);
+        publisher.publishEvent(new ActivityEvent(
+                user.getId(),
+                ActivityAction.UPDATED,
+                ActivityEntityType.PROFILE,
+                saved.getId()));
         log.info("Profile updated for user {}", user.getId());
         return mapToProfileResponse(saved);
     }
@@ -82,6 +92,11 @@ public class ProfileService {
         profile.setJobTitle(JobTitle.NONE);
 
         Profile saved = profileRepository.save(profile);
+        publisher.publishEvent(new ActivityEvent(
+                user.getId(),
+                ActivityAction.CREATED,
+                ActivityEntityType.PROFILE,
+                saved.getId()));
         log.info("Profile created for user {}", user.getId());
         return saved;
     }

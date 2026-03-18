@@ -58,6 +58,16 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    @ExceptionHandler(OAuth2Exception.class)
+    public ResponseEntity<?> handleOAuth2(OAuth2Exception ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                ApiResponse.builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(null)
+                        .build());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(

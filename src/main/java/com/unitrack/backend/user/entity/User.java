@@ -6,6 +6,7 @@ import com.unitrack.backend.activity.entity.Activity;
 import com.unitrack.backend.common.entity.BaseEntity;
 import com.unitrack.backend.projects.entity.Projects;
 import com.unitrack.backend.user.enums.SystemRole;
+import com.unitrack.backend.user.enums.OAuth2Provider;
 import com.unitrack.backend.workspaces.entity.Workspaces;
 import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
 
@@ -41,6 +42,13 @@ public class User extends BaseEntity {
     private SystemRole role;
 
     private Boolean isActive;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "oauth2_provider")
+    private OAuth2Provider oAuth2Provider;
+
+    @Column(name = "oauth2_provider_id")
+    private String oAuth2ProviderId;
 
     @OneToOne(mappedBy = "user")
     private Profile profile;

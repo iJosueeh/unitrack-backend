@@ -46,6 +46,16 @@ app:
     allowed-headers: ${CORS_ALLOWED_HEADERS:*}
     allow-credentials: ${CORS_ALLOW_CREDENTIALS:true}
 
+oauth2:
+  google:
+    client-id: ${OAUTH2_GOOGLE_CLIENT_ID:}
+    client-secret: ${OAUTH2_GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH2_GOOGLE_REDIRECT_URI:http://localhost:8080/api/auth/oauth2/callback}
+  microsoft:
+    client-id: ${OAUTH2_MICROSOFT_CLIENT_ID:}
+    client-secret: ${OAUTH2_MICROSOFT_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH2_MICROSOFT_REDIRECT_URI:http://localhost:8080/api/auth/oauth2/callback}
+
 server:
   port: 8080
 

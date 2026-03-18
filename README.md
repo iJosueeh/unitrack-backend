@@ -12,12 +12,14 @@ Backend API de UniTrack orientado a modelo SaaS, con autenticacion JWT y arquite
 1. [Stack](#stack)
 2. [Propuesta SaaS](#propuesta-saas)
 3. [Arquitectura](#arquitectura)
-4. [Configuracion local](#configuracion-local)
-5. [Ejecucion](#ejecucion)
-6. [Pruebas](#pruebas)
-7. [API](#api)
-8. [cURL rapido](#curl-rapido)
-9. [Roadmap SaaS](#roadmap-saas)
+4. [Autenticación](#autenticación)
+5. [Configuracion local](#configuracion-local)
+6. [Ejecucion](#ejecucion)
+7. [Pruebas](#pruebas)
+8. [API](#api)
+9. [Matriz endpoint -> ActivityEvent](#matriz-endpoint---activityevent)
+10. [cURL rapido](#curl-rapido)
+11. [Roadmap SaaS](#roadmap-saas)
 
 ## Stack
 
@@ -49,33 +51,51 @@ Objetivo de evolucion:
 
 ```text
 src/main/java/com/unitrack/backend
-  auth/        # Login y registro
+  auth/        # Login, registro y OAuth2
   security/    # Filtros JWT y configuracion de seguridad
   user/        # Entidades, DTOs, servicios y controlador de usuario
   common/      # Respuestas comunes, excepciones, utilidades
 ```
 
+## Autenticación
+
+UniTrack soporta dos métodos de autenticación:
+
+### 1. Autenticación local (email/password)
+- Registro: `POST /api/auth/register`
+- Login: `POST /api/auth/login`
+- Genera JWT con duración 15 minutos
+
+### 2. OAuth2 (Google y Microsoft)
+- Endpoint: `POST /api/auth/oauth2/callback`
+- Soporta login/registro automático con Google y Microsoft
+- Si el usuario no existe, se crea automáticamente
+- Si el usuario existe, se vincula el proveedor OAuth2
+
+**Ver:** [OAUTH2_GUIDE.md](./OAUTH2_GUIDE.md) para configuración detallada.
+
 ## Configuracion local
 
 La app soporta archivo `.env` en la raiz del proyecto (ya configurado en `application.yml` y en `launch.json`).
 
-Variables necesarias:
+### Variables necesarias
 
+**Base de datos:**
 - `DB_URL`
 - `DB_USERNAME`
 - `DB_PASSWORD`
+
+**JWT:**
 - `JWT_SECRET`
 - `JWT_REFRESH_SECRET`
 
-Ejemplo `.env`:
+**OAuth2 (opcional):**
+- `OAUTH2_GOOGLE_CLIENT_ID`
+- `OAUTH2_GOOGLE_CLIENT_SECRET`
+- `OAUTH2_MICROSOFT_CLIENT_ID`
+- `OAUTH2_MICROSOFT_CLIENT_SECRET`
 
-```dotenv
-DB_URL=jdbc:postgresql://localhost:5432/unitrack
-DB_USERNAME=postgres
-DB_PASSWORD=postgres
-JWT_SECRET=change-this-secret-key-at-least-32-characters
-JWT_REFRESH_SECRET=change-this-refresh-secret-key-at-least-32-characters
-```
+Ver `.env.example` para plantilla completa.
 
 ## Ejecucion
 
@@ -115,6 +135,36 @@ Header para endpoints protegidos:
 ```text
 Authorization: Bearer <JWT_TOKEN>
 ```
+
+## Matriz endpoint -> ActivityEvent
+
+Convencion actual:
+
+- `userId`: usuario autenticado que ejecuta la accion.
+- `entityId`: id de la entidad afectada.
+- Endpoints `GET` no publican eventos.
+
+| Endpoint | Evento |
+|---|---|
+| `POST /api/auth/register` | `CREATED / USERS` |
+| `PATCH /api/profile/me` | `UPDATED / PROFILE` |
+| `POST /api/workspaces` | `CREATED / WORKSPACE` |
+| `DELETE /api/workspaces/{workspaceId}/members/{userId}` | `DELETED / WORKSPACE_MEMBERS` |
+| `PATCH /api/workspaces/{workspaceId}/members/{userId}/role` | `UPDATED / WORKSPACE_MEMBERS` |
+| `POST /api/workspaces/invites` | `CREATED / WORKSPACE_INVITE` |
+| `POST /api/workspaces/invites/accept` | `CREATED / WORKSPACE_MEMBERS` |
+| `DELETE /api/workspaces/invites/{inviteId}` | `UPDATED / WORKSPACE_INVITE` |
+| `POST /api/workspaces/{workspaceId}/projects` | `CREATED / PROJECT` |
+| `PATCH /api/workspaces/{workspaceId}/projects/{projectId}` | `UPDATED / PROJECT` |
+| `PATCH /api/workspaces/{workspaceId}/projects/{projectId}/assign` | `ASSIGN / PROJECT` |
+| `DELETE /api/workspaces/{workspaceId}/projects/{projectId}/assign` | `ASSIGN / PROJECT` |
+| `PATCH /api/workspaces/{workspaceId}/projects/{projectId}/status` | `UPDATED / PROJECT` |
+| `POST /api/workspaces/{workspaceId}/projects/{projectId}/tasks` | `CREATED / TASKS` |
+| `PATCH /api/workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}` | `UPDATED / TASKS` |
+| `PATCH /api/workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}/assign` | `ASSIGN / TASKS` |
+| `DELETE /api/workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}/assign` | `ASSIGN / TASKS` |
+| `PATCH /api/workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}/status` | `UPDATED / TASKS` |
+| `DELETE /api/workspaces/{workspaceId}/projects/{projectId}/tasks/{taskId}` | `DELETED / TASKS` |
 
 ## cURL rapido
 

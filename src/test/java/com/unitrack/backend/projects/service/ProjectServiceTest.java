@@ -17,11 +17,16 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.unitrack.backend.activity.enums.ActivityAction;
+import com.unitrack.backend.activity.enums.ActivityEntityType;
+import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.enums.Priority;
 import com.unitrack.backend.common.enums.Status;
@@ -35,8 +40,6 @@ import com.unitrack.backend.projects.repository.ProjectsRepository;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.user.repository.UserRepository;
 import com.unitrack.backend.workspaces.entity.Workspaces;
-import com.unitrack.backend.workspaces.entity.WorkspacesMembers;
-import com.unitrack.backend.workspaces.enums.WorkspaceRole;
 import com.unitrack.backend.workspaces.repository.WorkspaceRepository;
 import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 
@@ -60,6 +63,9 @@ class ProjectServiceTest {
 
     @Mock
     private ValidateDateRange validate;
+
+    @Mock
+    private ApplicationEventPublisher publisher;
 
     @InjectMocks
     private ProjectService projectService;
@@ -162,6 +168,7 @@ class ProjectServiceTest {
         assertNull(response.assignedToId());
         assertEquals(createdById, response.createdById());
         verify(projectsRepository).save(project);
+        verify(publisher).publishEvent(any(ActivityEvent.class));
     }
 
     @Test
@@ -221,15 +228,75 @@ class ProjectServiceTest {
         verify(projectsRepository, never()).findByIdAndWorkspaces_Id(any(), any());
     }
 
-    private WorkspacesMembers membership(UUID workspaceId, User user, WorkspaceRole role) {
+    @Test
+    void createProject_ShouldPublishCreatedEvent_WhenRequestIsValid() {
+        UUID workspaceId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+
+        User requester = new User();
+        requester.setId(requesterId);
+
         Workspaces workspace = new Workspaces();
         workspace.setId(workspaceId);
 
-        WorkspacesMembers membership = new WorkspacesMembers();
-        membership.setWorkspaces(workspace);
-        membership.setUser(user);
-        membership.setRole(role);
-        return membership;
+        ProjectCreateRequest request = new ProjectCreateRequest(
+                "Project Alpha", "Description", "Client",
+                Status.TODO, Priority.MEDIUM, BigDecimal.TEN,
+                Timestamp.from(Instant.parse("2026-03-14T10:00:00Z")),
+                Timestamp.from(Instant.parse("2026-03-20T10:00:00Z")),
+                null);
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(requester);
+        when(projectsRepository.existsByNameIgnoreCaseAndWorkspaces_Id("Project Alpha", workspaceId)).thenReturn(false);
+        when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
+        when(projectsRepository.save(any(Projects.class))).thenAnswer(i -> {
+            Projects saved = i.getArgument(0);
+            saved.setId(projectId);
+            return saved;
+        });
+
+        ProjectResponse response = projectService.createProject(workspaceId, request);
+
+        assertEquals(projectId, response.id());
+        ArgumentCaptor<ActivityEvent> captor = ArgumentCaptor.forClass(ActivityEvent.class);
+        verify(publisher).publishEvent(captor.capture());
+
+        ActivityEvent event = captor.getValue();
+        assertEquals(requesterId, event.getUserId());
+        assertEquals(ActivityAction.CREATED, event.getAction());
+        assertEquals(ActivityEntityType.PROJECT, event.getEntityType());
+        assertEquals(projectId, event.getEntityId());
+    }
+
+    @Test
+    void updateProjectStatus_ShouldPublishUpdatedEvent_WhenRequestIsValid() {
+        UUID workspaceId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+
+        User requester = new User();
+        requester.setId(requesterId);
+
+        Projects project = project(projectId, workspaceId, requester, null);
+
+        when(currentUserService.getAuthenticatedUser()).thenReturn(requester);
+        when(projectsRepository.findByIdAndWorkspaces_Id(projectId, workspaceId)).thenReturn(Optional.of(project));
+        when(projectsRepository.save(any(Projects.class))).thenAnswer(i -> i.getArgument(0));
+
+        projectService.updateProjectStatus(
+                workspaceId,
+                projectId,
+                new ProjectStatusUpdateRequest(Status.IN_PROGRESS, Priority.HIGH));
+
+        ArgumentCaptor<ActivityEvent> captor = ArgumentCaptor.forClass(ActivityEvent.class);
+        verify(publisher).publishEvent(captor.capture());
+
+        ActivityEvent event = captor.getValue();
+        assertEquals(requesterId, event.getUserId());
+        assertEquals(ActivityAction.UPDATED, event.getAction());
+        assertEquals(ActivityEntityType.PROJECT, event.getEntityType());
+        assertEquals(projectId, event.getEntityId());
     }
 
     private Projects project(UUID projectId, UUID workspaceId, User createdBy, User assignedTo) {

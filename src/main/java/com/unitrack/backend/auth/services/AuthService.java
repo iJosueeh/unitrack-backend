@@ -14,7 +14,6 @@ import com.unitrack.backend.auth.dto.AuthResponse;
 import com.unitrack.backend.auth.dto.LoginRequest;
 import com.unitrack.backend.auth.dto.RegisterRequest;
 import com.unitrack.backend.security.jwt.JwtService;
-import com.unitrack.backend.user.entity.Profile;
 import com.unitrack.backend.user.entity.User;
 import com.unitrack.backend.user.repository.UserRepository;
 import com.unitrack.backend.user.services.ProfileService;
@@ -40,19 +39,13 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
         User user = userService.createUser(request);
-        Profile profile = profileService.createProfile(user);
+        profileService.createProfile(user);
 
         publisher.publishEvent(new ActivityEvent(
                 user.getId(),
                 ActivityAction.CREATED,
                 ActivityEntityType.USERS,
                 user.getId()));
-
-        publisher.publishEvent(new ActivityEvent(
-                profile.getUser().getId(),
-                ActivityAction.CREATED,
-                ActivityEntityType.PROFILE,
-                profile.getId()));
 
         log.info("User created with email: {}", user.getEmail());
         return buildAuthResponse(user);

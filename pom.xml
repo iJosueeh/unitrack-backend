@@ -61,6 +61,22 @@
 		<version>0.12.6</version>
 		<scope>runtime</scope>
 	</dependency>
+	<!-- OAuth2 Dependencies -->
+	<dependency>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-oauth2-client</artifactId>
+	</dependency>
+	<dependency>
+		<groupId>com.google.auth</groupId>
+		<artifactId>google-auth-library-oauth2-http</artifactId>
+		<version>1.11.0</version>
+	</dependency>
+	<dependency>
+		<groupId>com.squareup.okhttp3</groupId>
+		<artifactId>okhttp</artifactId>
+		<version>4.11.0</version>
+	</dependency>
+	<!-- End OAuth2 Dependencies -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>

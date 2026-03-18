@@ -1,5 +1,8 @@
 package com.unitrack.backend.projects.service;
 
+import com.unitrack.backend.activity.enums.ActivityAction;
+import com.unitrack.backend.activity.enums.ActivityEntityType;
+import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.exception.ConflictException;
 import com.unitrack.backend.common.exception.NotFoundException;
@@ -15,6 +18,7 @@ import com.unitrack.backend.workspaces.repository.WorkspaceRepository;
 import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +37,7 @@ public class ProjectService {
     private final WorkspaceRepository workspaceRepository;
     private final UserRepository userRepository;
     private final ValidateDateRange validate;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional
     public ProjectResponse createProject(UUID workspaceId, ProjectCreateRequest request) {
@@ -74,6 +79,11 @@ public class ProjectService {
         project.setWorkspaces(workspace);
 
         Projects saved = projectsRepository.save(project);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.CREATED,
+                ActivityEntityType.PROJECT,
+                saved.getId()));
         log.info("Project '{}' created with ID '{}' in workspace '{}'", saved.getName(), saved.getId(), workspaceId);
         return mapToProjectResponse(saved);
     }
@@ -142,6 +152,11 @@ public class ProjectService {
         }
 
         Projects saved = projectsRepository.save(project);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.UPDATED,
+                ActivityEntityType.PROJECT,
+                saved.getId()));
         log.info("Project '{}' updated in workspace '{}'", projectId, workspaceId);
         return mapToProjectResponse(saved);
     }
@@ -163,6 +178,11 @@ public class ProjectService {
 
         project.setAssignedTo(assignedTo);
         Projects saved = projectsRepository.save(project);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.ASSIGN,
+                ActivityEntityType.PROJECT,
+                saved.getId()));
         log.info("User '{}' assigned to project '{}' in workspace '{}'", request.assignedToId(), projectId, workspaceId);
         return mapToProjectResponse(saved);
     }
@@ -180,6 +200,11 @@ public class ProjectService {
 
         project.setAssignedTo(null);
         Projects saved = projectsRepository.save(project);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.ASSIGN,
+                ActivityEntityType.PROJECT,
+                saved.getId()));
         log.info("Project '{}' unassigned successfully in workspace '{}'", projectId, workspaceId);
         return mapToProjectResponse(saved);
     }
@@ -201,6 +226,11 @@ public class ProjectService {
         if (request.priority() != null) project.setPriority(request.priority());
 
         Projects saved = projectsRepository.save(project);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.UPDATED,
+                ActivityEntityType.PROJECT,
+                saved.getId()));
         log.info("Project '{}' status updated to '{}' in workspace '{}'", projectId, request.status(), workspaceId);
         return mapToProjectResponse(saved);
     }

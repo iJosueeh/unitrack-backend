@@ -1,5 +1,8 @@
 package com.unitrack.backend.tasks.service;
 
+import com.unitrack.backend.activity.enums.ActivityAction;
+import com.unitrack.backend.activity.enums.ActivityEntityType;
+import com.unitrack.backend.activity.event.ActivityEvent;
 import com.unitrack.backend.auth.services.CurrentUserService;
 import com.unitrack.backend.common.exception.NotFoundException;
 import com.unitrack.backend.projects.entity.Projects;
@@ -12,6 +15,7 @@ import com.unitrack.backend.user.repository.UserRepository;
 import com.unitrack.backend.workspaces.security.WorkspaceAccessPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +32,7 @@ public class TaskService {
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
     private final WorkspaceAccessPolicy workspaceAccessPolicy;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional
     public TaskResponse createTask(UUID workspaceId, UUID projectId, TaskCreateRequest request) {
@@ -55,6 +60,11 @@ public class TaskService {
         task.setAssignedTo(assignedTo);
 
         Tasks savedTask = taskRepository.save(task);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.CREATED,
+                ActivityEntityType.TASKS,
+                savedTask.getId()));
         log.info("Created task with id {} in project {} and workspace {}", savedTask.getId(), projectId, workspaceId);
         return mapToResponse(savedTask);
     }
@@ -79,6 +89,11 @@ public class TaskService {
         if (request.assignedToId() != null) task.setAssignedTo(resolveAssignee(workspaceId, request.assignedToId()));
 
         Tasks savedTask = taskRepository.save(task);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.UPDATED,
+                ActivityEntityType.TASKS,
+                savedTask.getId()));
         log.info("Updated task with id {} in project {} and workspace {}", savedTask.getId(), projectId, workspaceId);
         return mapToResponse(savedTask);
     }
@@ -97,6 +112,11 @@ public class TaskService {
         task.setAssignedTo(resolveAssignee(workspaceId, request.assignedToId()));
 
         Tasks savedTask = taskRepository.save(task);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.ASSIGN,
+                ActivityEntityType.TASKS,
+                savedTask.getId()));
         log.info("Assigned task with id {} to user {} in project {} and workspace {}", savedTask.getId(), request.assignedToId(), projectId, workspaceId);
         return mapToResponse(savedTask);
     }
@@ -115,6 +135,11 @@ public class TaskService {
 
         task.setAssignedTo(null);
         Tasks savedTask = taskRepository.save(task);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.ASSIGN,
+                ActivityEntityType.TASKS,
+                savedTask.getId()));
         log.info("Unassigned task with id {} in project {} and workspace {}", savedTask.getId(), projectId, workspaceId);
         return mapToResponse(savedTask);
     }
@@ -140,6 +165,11 @@ public class TaskService {
         if (request.priority() != null) task.setPriority(request.priority());
 
         Tasks savedTask = taskRepository.save(task);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.UPDATED,
+                ActivityEntityType.TASKS,
+                savedTask.getId()));
         log.info("Updated status of task with id {} to {} in project {} and workspace {}", savedTask.getId(), request.status(), projectId, workspaceId);
         return mapToResponse(savedTask);
     }
@@ -151,6 +181,11 @@ public class TaskService {
 
         Tasks task = findTask(taskId, projectId, workspaceId);
         taskRepository.delete(task);
+        publisher.publishEvent(new ActivityEvent(
+                requester.getId(),
+                ActivityAction.DELETED,
+                ActivityEntityType.TASKS,
+                task.getId()));
         log.info("Task '{}' deleted from project '{}' / workspace '{}'", taskId, projectId, workspaceId);
     }
 

@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.unitrack.backend.auth.dto.AuthResponse;
 import com.unitrack.backend.auth.dto.LoginRequest;
+import com.unitrack.backend.auth.dto.OAuth2CallbackRequest;
 import com.unitrack.backend.auth.dto.RegisterRequest;
 import com.unitrack.backend.auth.services.AuthService;
+import com.unitrack.backend.auth.services.OAuth2AuthService;
 import com.unitrack.backend.common.response.ApiResponse;
 
 import jakarta.validation.Valid;
@@ -22,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class AuthController {
 
     private final AuthService authService;
+    private final OAuth2AuthService oAuth2AuthService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
@@ -42,6 +45,18 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Login successful")
+                .data(authResponse)
+                .build());
+    }
+
+    @PostMapping("/oauth2/callback")
+    public ResponseEntity<ApiResponse<AuthResponse>> oAuth2Callback(
+            @Valid @RequestBody OAuth2CallbackRequest request) {
+        AuthResponse authResponse = oAuth2AuthService.handleOAuth2Callback(request);
+
+        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .message("OAuth2 authentication successful")
                 .data(authResponse)
                 .build());
     }
